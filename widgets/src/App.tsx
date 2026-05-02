@@ -1,19 +1,13 @@
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { LoadingIndicator } from "@openai/apps-sdk-ui/components/Indicator";
 import { useState } from "react";
-import { MoviesList } from "./movie-list";
-import { MovieDetails } from "./movie-details";
-import type { MovieDetail, MoviesResponse } from "./types";
 
-interface ToolOutput {
-  movies?: MoviesResponse;
-  movie?: MovieDetail;
-}
+
 
 function App() {
-  const [toolOutput, setToolOutput] = useState<ToolOutput | null>(null);
+  const [toolOutput, setToolOutput] = useState<object | null>(null);
   const { app } = useApp({
-    appInfo: { name: "Movies Client", version: "1.0" },
+    appInfo: { name: "Flashcards Client", version: "1.0" },
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = (result) => {
@@ -24,17 +18,11 @@ function App() {
     },
   });
 
-  console.log(app?.getHostContext());
 
   useHostStyles(app, app?.getHostContext());
 
-  if (toolOutput?.movies) {
-    return <MoviesList movies={toolOutput.movies} />;
-  }
+  console.log(toolOutput);
 
-  if (toolOutput?.movie) {
-    return <MovieDetails movie={toolOutput.movie} />;
-  }
 
   return <div className="items-center justify-center flex min-h-50">
     <LoadingIndicator size={32} />
