@@ -80,7 +80,7 @@ export default {
 				const cardsWithIds = cards.map((card, index) => ({
 					id: `card-${Date.now()}-${index}`,
 					...card,
-					status: 'now',
+					status: 'new',
 				}));
 				const deck = {
 					id: `deck-${Date.now()}`,
