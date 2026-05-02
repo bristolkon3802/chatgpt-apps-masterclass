@@ -64,7 +64,7 @@ export default {
 				description:
 					'이를 사용하여 스터디용 플래시 카드 덱을 만듭니다. 앞면(질문)과 뒷면(답변)에 힌트를 포함한 20장의 카드를 생성합니다. 이 도구를 사용하기 전에 사용자에게 사용자 이름을 물어보세요.',
 				inputSchema: {
-					usernaem: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
+					username: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
 					deck: deckSchema,
 				},
 				annotations: {
@@ -76,7 +76,7 @@ export default {
 					},
 				},
 			},
-			async ({ deck: { title, description, cards }, usernaem }) => {
+			async ({ deck: { title, description, cards }, username }) => {
 				const cardsWithIds = cards.map((card, index) => ({
 					id: `card-${Date.now()}-${index}`,
 					...card,
@@ -90,12 +90,12 @@ export default {
 					createdAt: new Date().toISOString(),
 				};
 
-				const decksKey = `user:${usernaem}:decks`;
+				const decksKey = `user:${username}:decks`;
 
 				// 카드뭉치 data를 FLASHARDS_KV에 저장
-				await env.FLASHCARDS_KV.put(`user:${usernaem}:deck:${deck}`, JSON.stringify(deck));
+				await env.FLASHCARDS_KV.put(`user:${username}:deck:${deck.id}`, JSON.stringify(deck));
 
-				// usernaem을 사용해서 카드뭉치 조회
+				// username을 사용해서 카드뭉치 조회
 				const existingIds = await env.FLASHCARDS_KV.get<string[]>(decksKey, 'json');
 
 				// 조회된 카드뭉치가 있다면 추가, 없다면 [] 예) `user:bingstar:decks` -> ['deck_1', 'deck_2', 'deck_3'] || 만약 없다면 빈 []
@@ -116,7 +116,7 @@ export default {
 							text: `${cards.length} 플래시카드로 ${title} 덱을 만들었습니다`,
 						},
 					],
-					structuredContent: { deck, usernaem },
+					structuredContent: { deck, username },
 				};
 			},
 		);
@@ -130,7 +130,7 @@ export default {
 				description:
 					'이를 사용하여 사용자에게 덱 목록을 보여줍니다. 모르는 경우 이 도구를 사용하기 전에 사용자에게 사용자 이름을 물어보세요.',
 				inputSchema: {
-					usernaem: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
+					username: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
 				},
 				annotations: {
 					readOnlyHint: true,
@@ -141,9 +141,9 @@ export default {
 					},
 				},
 			},
-			async ({ usernaem }) => {
+			async ({ username }) => {
 				// username을 사용해서 key를 생성
-				const decksKey = `user:${usernaem}:decks`;
+				const decksKey = `user:${username}:decks`;
 
 				// 생성된 key를 통해 보유중인 모든 deck ID를 조회
 				const deckIds = await env.FLASHCARDS_KV.get<string[]>(decksKey, 'json');
@@ -151,7 +151,7 @@ export default {
 				// 보유중인 deck이 없음
 				if (!deckIds || deckIds.length === 0) {
 					return {
-						content: [{ text: `${usernaem}는 카드뭉치가 없습니다.`, type: 'text' }],
+						content: [{ text: `${username}는 카드뭉치가 없습니다.`, type: 'text' }],
 						structuredContent: { decks: [] },
 					};
 				}
@@ -164,7 +164,7 @@ export default {
 				// deckID를 이용
 				for (const deckId of deckIds) {
 					// 상응하는 deck를 가져온 후
-					const deck = await env.FLASHCARDS_KV.get<Deck>(`user:${usernaem}:deck:${deckId}`, 'json');
+					const deck = await env.FLASHCARDS_KV.get<Deck>(`user:${username}:deck:${deckId}`, 'json');
 					// deck이 존재한다면
 					if (deck) {
 						// 몇장의 카드가 있는지 카운트
@@ -186,7 +186,7 @@ export default {
 						},
 					],
 					// 모든걸 위젯에 넘김
-					structuredContent: { decks, usernaem },
+					structuredContent: { decks, username },
 				};
 			},
 		);
