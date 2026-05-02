@@ -6,6 +6,7 @@ import z from 'zod';
 const WIDGET_URI = 'ui://flashcards-widget';
 
 const cardSchema = z.object({
+	id: z.string().readonly(),
 	front: z.string().describe('질문 또는 프롬프트'),
 	back: z.string().describe('정답'),
 	hint: z.string().describe('카드에 대한 힌트'),
@@ -78,8 +79,8 @@ export default {
 			},
 			async ({ deck: { title, description, cards }, username }) => {
 				const cardsWithIds = cards.map((card, index) => ({
-					id: `card-${Date.now()}-${index}`,
 					...card,
+					id: `card-${Date.now()}-${index}`,
 					status: 'new',
 				}));
 				const deck = {
@@ -191,7 +192,7 @@ export default {
 			},
 		);
 
-		// open deck -> 선택한 카드 뭉치의 모든 카드를 가져옴
+		// open deck -> 선택한 카드 뭉치의 모든 카드를 가져옴(공부 시작)
 		registerAppTool(
 			server,
 			'open-deck',
@@ -242,8 +243,123 @@ export default {
 		);
 
 		// mark card (private) -> (AI model 호출 X, 유저 클릭으로 호출) 단어의 암기상태 즉 유저가 단어 공부를 하다 특정 단어를 마스터 했다면 완벽히 숙달하고 기억, 그걸 유저가 볼 수 있게 표시 해줌 (몇개의 단어를 마스터했는지 또는 하지 못했는지 표시)
+		registerAppTool(
+			server,
+			'mark-card',
+			{
+				title: 'Mark Card',
+				description: '이것은 카드의 상태를 변경하기 위한 것입니다.',
+				inputSchema: {
+					username: z.string(),
+					deckId: z.string(),
+					status: z.enum(['learning', 'mastered']),
+					cardId: z.string(),
+				},
+				annotations: {
+					readOnlyHint: false,
+				},
+				_meta: {
+					ui: {
+						visibility: ['app'], // app -> AI model 호출없이, 클릭으로만 호출되는 tool들을 만들때 사용.
+					},
+				},
+			},
+			async ({ username, deckId, cardId, status }) => {
+				// username과 deckId 사용해서 key 생성
+				const deckKey = `user:${username}:deck:${deckId}`;
+
+				// 생성된 key를 통해 보유중인 모든 deck ID를 조회
+				const deck = await env.FLASHCARDS_KV.get<Deck>(deckKey, 'json');
+
+				// 보유중인 deck이 없음
+				if (!deck) {
+					return {
+						content: [{ text: `오류: 찾을 수 없음`, type: 'text' }],
+						isError: true,
+					};
+				}
+
+				// deck 안에서 card ID로 card 찾기 / 1.(deck object 안에 있는 card에 대한 reference를 받음)
+				const card = deck.cards.find((card) => card.id === cardId);
+
+				// 찾은 card의 status를 변경 / 2.(reference를 받기때문에 card.status = status값을 이렇게 바꾸는 것만으로도 deck object 안에서도 card status가 업데이트 됨)
+				if (card) {
+					card.status = status;
+				}
+
+				// 변경된 deck 저장
+				await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+
+				return {
+					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
+					content: [
+						{
+							type: 'text',
+							text: `카드 ${cardId}가 ${status} 상태로 업데이트 되었습니다.`,
+						},
+					],
+					// 모든걸 위젯에 넘김
+					structuredContent: { deck },
+				};
+			},
+		);
 
 		// reset deck (private) -> (AI model 호출 X, 유저 클릭으로 호출) 처음부터 공부를 다시 시작하고 싶을 수도 있으니 초기화 해줌
+		registerAppTool(
+			server,
+			'reset-deck',
+			{
+				title: 'Reset Deck',
+				description: '카드 뭉치의 고부 진도를 리셋하는 툴.',
+				inputSchema: {
+					username: z.string(),
+					deckId: z.string(),
+				},
+				annotations: {
+					readOnlyHint: true,
+				},
+				_meta: {
+					ui: {
+						visibility: ['app'], // app -> AI model 호출없이, 클릭으로만 호출되는 tool들을 만들때 사용.
+					},
+				},
+			},
+			async ({ username, deckId }) => {
+				// username과 deckId 사용해서 key 생성
+				const deckKey = `user:${username}:deck:${deckId}`;
+
+				// 생성된 key를 통해 보유중인 모든 deck ID를 조회
+				const deck = await env.FLASHCARDS_KV.get<Deck>(deckKey, 'json');
+
+				// 보유중인 deck이 없음
+				if (!deck) {
+					return {
+						content: [{ text: `오류: 찾을 수 없음`, type: 'text' }],
+						isError: true,
+					};
+				}
+
+				// deck 내의 각 card의 status를 new로 변경
+				for (const card of deck.cards) {
+					card.status = 'new';
+				}
+
+				// 수정된 deck을 저장
+				await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+
+				return {
+					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
+					content: [
+						{
+							type: 'text',
+							text: `Deck 진행 상황이 재설정되었습니다.`,
+						},
+					],
+					// 모든걸 위젯에 넘김
+					structuredContent: { deck },
+				};
+			},
+		);
 
 		// delete deck -> 카드 뭉치 삭제
 		registerAppTool(
