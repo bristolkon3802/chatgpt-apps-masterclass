@@ -121,7 +121,7 @@ export default {
 			},
 		);
 
-		// list decks -> 카드 리스트가 있다면 모두 볼 수 있게 해주는 tool
+		// userId list decks -> userId로 조회 한 후 카드 리스트가 있다면 모두 볼 수 있게 해주는 tool
 		registerAppTool(
 			server,
 			'list-deck',
@@ -192,12 +192,104 @@ export default {
 		);
 
 		// open deck -> 선택한 카드 뭉치의 모든 카드를 가져옴
+		registerAppTool(
+			server,
+			'open-deck',
+			{
+				title: 'Open Deck',
+				description:
+					'이를 사용하여 사용자가 공부할 수 있는 Deck를 엽니다. 이 도구를 사용하기 전에 사용자에게 사용자 이름을 물어보세요. 덱 ID도 가지고 있는지 확인하세요.',
+				inputSchema: {
+					username: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
+					deckId: z.string().describe('deck의 ID입니다. `list-decks` 도구를 사용하여 얻을 수 있습니다'),
+				},
+				annotations: {
+					readOnlyHint: true,
+				},
+				_meta: {
+					ui: {
+						resourceUri: WIDGET_URI,
+					},
+				},
+			},
+			async ({ username, deckId }) => {
+				// username과 deckId 사용해서 key 생성
+				const decksKey = `user:${username}:deck:${deckId}`;
+
+				// 생성된 key를 통해 보유중인 모든 deck ID를 조회
+				const deck = await env.FLASHCARDS_KV.get<Deck>(decksKey, 'json');
+
+				// 보유중인 deck이 없음
+				if (!deck) {
+					return {
+						content: [{ text: `Deck이 없습니다.`, type: 'text' }],
+						structuredContent: { decks: [] },
+					};
+				}
+
+				return {
+					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
+					content: [
+						{
+							type: 'text',
+							text: `${deck.description}로 ${deck.title}이 공부하기 시작했습니다. ${deck.cards}`,
+						},
+					],
+					// 모든걸 위젯에 넘김
+					structuredContent: { deck, username, deckId },
+				};
+			},
+		);
 
 		// mark card (private) -> (AI model 호출 X, 유저 클릭으로 호출) 단어의 암기상태 즉 유저가 단어 공부를 하다 특정 단어를 마스터 했다면 완벽히 숙달하고 기억, 그걸 유저가 볼 수 있게 표시 해줌 (몇개의 단어를 마스터했는지 또는 하지 못했는지 표시)
 
 		// reset deck (private) -> (AI model 호출 X, 유저 클릭으로 호출) 처음부터 공부를 다시 시작하고 싶을 수도 있으니 초기화 해줌
 
 		// delete deck -> 카드 뭉치 삭제
+		registerAppTool(
+			server,
+			'delete-deck',
+			{
+				title: 'Delete Deck',
+				description:
+					'이를 사용하여 Deck을 삭제합니다. usernaem을 모르는 경우 이 도구를 사용하기 전에 사용자에게 사용자 이름을 물어보세요. 덱 ID도 가지고 있는지 확인하세요.',
+				inputSchema: {
+					username: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
+					deckId: z.string().describe('삭제할 Deck의 ID. `list-decks` 도구를 사용하여 얻을 수 있습니다'),
+				},
+				annotations: {
+					readOnlyHint: true,
+				},
+				_meta: {},
+			},
+			async ({ username, deckId }) => {
+				// username과 deckId 사용해서 key 생성
+				const deckKey = `user:${username}:deck:${deckId}`;
+
+				// 생성된 key를 통해 보유중인 모든 deck ID를 조회
+				const deck = await env.FLASHCARDS_KV.get<Deck>(deckKey, 'json');
+
+				// 보유중인 deck이 없음
+				if (!deck) {
+					return {
+						content: [{ text: `Deck이 없습니다.`, type: 'text' }],
+					};
+				}
+				await env.FLASHCARDS_KV.delete(deckKey);
+
+				return {
+					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
+					content: [
+						{
+							type: 'text',
+							text: `Deck 삭제 완료`,
+						},
+					],
+					// 모든걸 위젯에 넘김
+					structuredContent: { deck, username, deckId },
+				};
+			},
+		);
 
 		// @ts-ignore
 		const handler = createMcpHandler(server);
