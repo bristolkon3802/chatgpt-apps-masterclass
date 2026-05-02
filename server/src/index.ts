@@ -232,7 +232,7 @@ export default {
 					content: [
 						{
 							type: 'text',
-							text: `${deck.description}로 ${deck.title}이 공부하기 시작했습니다. ${deck.cards}`,
+							text: `${deck.description}로 ${deck.title}이 공부하기 시작했습니다. ${JSON.stringify(deck.cards)}`,
 						},
 					],
 					// 모든걸 위젯에 넘김
