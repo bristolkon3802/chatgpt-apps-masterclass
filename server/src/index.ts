@@ -5,6 +5,22 @@ import z from 'zod';
 
 const WIDGET_URI = 'ui://flashcards-widget';
 
+const cardSchema = z.object({
+	front: z.string().describe('질문 또는 프롬프트'),
+	back: z.string().describe('정답'),
+	hint: z.string().describe('카드에 대한 힌트'),
+	status: z.enum(['new', 'learning', 'mastered']).readonly().default('new'),
+});
+
+const deckSchema = z.object({
+	title: z.string().describe("덱의 제목: 예를 들어 '리액트 펀더멘털'"),
+	description: z.string().describe('이 덱이 다루는 내용에 대한 간략한 설명'),
+	cards: z.array(cardSchema).min(10).max(20).describe('플래시 카드 배열 (20장 목표).'),
+});
+
+type Deck = z.infer<typeof deckSchema>;
+type Card = z.infer<typeof cardSchema>;
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const server = new McpServer({
@@ -38,10 +54,6 @@ export default {
 			};
 		});
 
-		await env.FLASHCARDS_KV.put('hello', '{"hello": "world"}');
-
-		await env.FLASHCARDS_KV.get('hello', 'json');
-
 		// create deck -> AI model이 카드(Flashcard) 덱을 만듬
 		// ex) "나는 영어를 배우고 싶으니간, 20개의 단어를 줘"  AI model이 data를 만들어 줌
 		registerAppTool(
@@ -53,19 +65,7 @@ export default {
 					'이를 사용하여 스터디용 플래시 카드 덱을 만듭니다. 앞면(질문)과 뒷면(답변)에 힌트를 포함한 20장의 카드를 생성합니다. 이 도구를 사용하기 전에 사용자에게 사용자 이름을 물어보세요.',
 				inputSchema: {
 					usernaem: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
-					title: z.string().describe("덱의 제목: 예를 들어 '리액트 펀더멘털'"),
-					description: z.string().describe('이 덱이 다루는 내용에 대한 간략한 설명'),
-					cards: z
-						.array(
-							z.object({
-								front: z.string().describe('질문 또는 프롬프트'),
-								back: z.string().describe('정답'),
-								hint: z.string().describe('카드에 대한 힌트'),
-							}),
-						)
-						.min(10)
-						.max(20)
-						.describe('플래시 카드 배열 (20장 목표).'),
+					deck: deckSchema,
 				},
 				annotations: {
 					readOnlyHint: false,
@@ -76,11 +76,11 @@ export default {
 					},
 				},
 			},
-			async ({ title, description, cards, usernaem }) => {
+			async ({ deck: { title, description, cards }, usernaem }) => {
 				const cardsWithIds = cards.map((card, index) => ({
 					id: `card-${Date.now()}-${index}`,
-					status: 'now',
 					...card,
+					status: 'now',
 				}));
 				const deck = {
 					id: `deck-${Date.now()}`,
@@ -122,6 +122,74 @@ export default {
 		);
 
 		// list decks -> 카드 리스트가 있다면 모두 볼 수 있게 해주는 tool
+		registerAppTool(
+			server,
+			'list-deck',
+			{
+				title: 'List Deck',
+				description:
+					'이를 사용하여 사용자에게 덱 목록을 보여줍니다. 모르는 경우 이 도구를 사용하기 전에 사용자에게 사용자 이름을 물어보세요.',
+				inputSchema: {
+					usernaem: z.string().describe('사용자의 사용자 이름입니다. 도구를 사용하기 전에 이를 요청하세요.'),
+				},
+				annotations: {
+					readOnlyHint: true,
+				},
+				_meta: {
+					ui: {
+						resourceUri: WIDGET_URI,
+					},
+				},
+			},
+			async ({ usernaem }) => {
+				// username을 사용해서 key를 생성
+				const decksKey = `user:${usernaem}:decks`;
+
+				// 생성된 key를 통해 보유중인 모든 deck ID를 조회
+				const deckIds = await env.FLASHCARDS_KV.get<string[]>(decksKey, 'json');
+
+				// 보유중인 deck이 없음
+				if (!deckIds || deckIds.length === 0) {
+					return {
+						content: [{ text: `${usernaem}는 카드뭉치가 없습니다.`, type: 'text' }],
+						structuredContent: { decks: [] },
+					};
+				}
+
+				// push에 오류가 뜨는 이유는 existingIds를 알아보지 못하고 (unknown) deckIds를 빈 object로 취급해서임. 그래서 get<string[]>를 명시
+				// 처음 접속할때는 데이터가 비어있는 상태이기 때문에 <string[]> 명시
+				// 유저가 가진 deck의 ID를 찾았다면 리스트를 생성
+				const decks = [];
+
+				// deckID를 이용
+				for (const deckId of deckIds) {
+					// 상응하는 deck를 가져온 후
+					const deck = await env.FLASHCARDS_KV.get<Deck>(`user:${usernaem}:deck:${deckId}`, 'json');
+					// deck이 존재한다면
+					if (deck) {
+						// 몇장의 카드가 있는지 카운트
+						const masteredCount = deck.cards.filter((card) => card.status === 'mastered').length;
+						// deck에 마스터한 카드 개수를 추가 후 deck list에 넣음
+						decks.push({ masteredCount, ...deck });
+					}
+				}
+
+				// 방금만든 카드뭉치 (decksKey)와, 새로 만든 뭉치가 추가된 (deckIds) 페어를 FLASHCARDS_KV에 추가
+				await env.FLASHCARDS_KV.put(decksKey, JSON.stringify(deckIds));
+
+				return {
+					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
+					content: [
+						{
+							type: 'text',
+							text: `총 ${decks.length}개, ${JSON.stringify(decks)}`,
+						},
+					],
+					// 모든걸 위젯에 넘김
+					structuredContent: { decks, usernaem },
+				};
+			},
+		);
 
 		// open deck -> 선택한 카드 뭉치의 모든 카드를 가져옴
 
