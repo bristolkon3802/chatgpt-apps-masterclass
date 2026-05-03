@@ -18,26 +18,31 @@ export interface DeckSummary extends Deck {
   masteredCount: number;
 }
 
+// structuredContent from create-deck
 export interface CreateDeckOutput {
   deck: Deck;
   username: string;
 }
 
+// structuredContent from list-decks
 export interface ListDecksOutput {
   decks: DeckSummary[];
   username: string;
 }
 
+// structuredContent from open-deck
 export interface OpenDeckOutput {
   deck: Deck;
   username: string;
   deckId: string;
 }
 
+// structuredContent from mark-card
 export interface MarkCardOutput {
   deck: Deck;
 }
 
+// structuredContent from reset-deck
 export interface ResetDeckOutput {
   deck: Deck;
 }
