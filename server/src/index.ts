@@ -288,7 +288,7 @@ export default {
 				}
 
 				// 변경된 deck 저장
-				await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+				await env.FLASHCARDS_KV.put(deckKey, JSON.stringify(deck));
 
 				return {
 					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
@@ -345,7 +345,7 @@ export default {
 				}
 
 				// 수정된 deck을 저장
-				await env.FLASHCARDS_KV.put(deckId, JSON.stringify(deck));
+				await env.FLASHCARDS_KV.put(deckKey, JSON.stringify(deck));
 
 				return {
 					// model에 넘겨 우리가 몇 개의 deck를 찾았는지 알림
