@@ -9,6 +9,8 @@ import { FlashcardStudy } from "./components/flashcard-study";
 
 function App() {
   const [toolOutput, setToolOutput] = useState<ToolOutput | null>(null);
+  const [viewUUID, setViewUUID] = useState<string | null>(null);
+
   const { app, error } = useApp({
     appInfo: { name: "Flashcards Client", version: "1.0" },
     capabilities: {},
@@ -16,6 +18,10 @@ function App() {
       app.ontoolresult = (result) => {
         if (result.structuredContent) {
           setToolOutput(result.structuredContent as unknown as ToolOutput);
+        }
+        // server에서 상호 작용을 위해 UUID를 넘겨받는다.
+        if (result._meta) {
+          setViewUUID(result._meta.viewUUID as unknown as string)
         }
       };
     },
@@ -44,6 +50,7 @@ function App() {
       <FlashcardStudy
         deck={toolOutput.deck}
         app={app}
+        viewUUID={viewUUID}
         username={"username" in toolOutput ? toolOutput.username : "anonymous"}
       />
     )

@@ -2,18 +2,43 @@ import { useState } from "react";
 import type { App } from "@modelcontextprotocol/ext-apps/react";
 import type { Card, Deck } from "../types";
 
+// 새로고침해도 작업상태가 유지되게 정의 , object 는  JSON으로 받아야 한다.
+function saveState(viewUUID: string | null, state: object) {
+  if (!viewUUID) return null;
+  localStorage.setItem(viewUUID, JSON.stringify(state));
+}
+
+function loadState(viewUUID: string | null) {
+  if (!viewUUID) return null;
+  const state = localStorage.getItem(viewUUID);
+  if (!state) {
+    return null;
+  }
+  return JSON.parse(state);
+}
+
 export function useStudySession({
   deck,
   app,
   username,
+  viewUUID,
 }: {
   deck: Deck;
   app: App | null;
   username: string;
+  viewUUID: string | null;
 }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const savedtate = loadState(viewUUID);
+
+  // 유저가 현재 위치한 카드 번호
+  const [currentIndex, setCurrentIndex] = useState(
+    savedtate ? savedtate.currentIndex : 0
+  );
+  // cards는 tool의 결과값(사용자가 실시간으로 mastered 또는 learning 로 표시하면 상태를 실시간으로 수정해서 사용자에게 업데이트 내용을 보여줌)
+  const [cards, setCards] = useState<Card[]>(
+    savedtate ? savedtate.cards : deck.cards
+  );
   const [isFlipped, setIsFlipped] = useState(false);
-  const [cards, setCards] = useState<Card[]>(deck.cards);
   const [loading, setLoading] = useState<string | null>(null);
 
   const currentCard = cards[currentIndex];
@@ -21,14 +46,18 @@ export function useStudySession({
 
   function goNext() {
     if (currentIndex >= cards.length - 1) return;
-    setCurrentIndex(currentIndex + 1);
+    const nextIndex = currentIndex + 1;
+    setCurrentIndex(nextIndex);
     setIsFlipped(false);
+    saveState(viewUUID, { cards, currentIndex: nextIndex });
   }
 
   function goPrev() {
     if (currentIndex <= 0) return;
-    setCurrentIndex(currentIndex - 1);
+    const nextIndex = currentIndex - 1;
+    setCurrentIndex(nextIndex);
     setIsFlipped(false);
+    saveState(viewUUID, { cards, currentIndex: nextIndex });
   }
 
   function toggleFlip() {
@@ -54,6 +83,7 @@ export function useStudySession({
 
       const updated = [...cards];
       updated[currentIndex] = { ...currentCard, status };
+      saveState(viewUUID, { currentIndex, cards: updated });
       setCards(updated);
 
       if (currentIndex < cards.length - 1) {
@@ -103,6 +133,7 @@ export function useStudySession({
       }
       const resetCards = cards.map((c) => ({ ...c, status: "new" as const }));
       setCards(resetCards);
+      saveState(viewUUID, { currentIndex: 0, cards: resetCards });
       setCurrentIndex(0);
       setIsFlipped(false);
     } finally {

@@ -2,6 +2,7 @@ import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from '@model
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createMcpHandler } from 'agents/mcp';
 import z from 'zod';
+import crypto from 'node:crypto'; // worker가 node.js API 사용 가능.
 
 const WIDGET_URI = 'ui://flashcards-widget';
 
@@ -238,6 +239,11 @@ export default {
 					],
 					// 모든걸 위젯에 넘김
 					structuredContent: { deck, username, deckId },
+
+					// 새로고침해도 상호 작용 가능하게 정의 server 에서 widgets 으로 viewUUID를 보냄(App.tsx 파일 확인)
+					_meta: {
+						viewUUID: crypto.randomUUID(),
+					},
 				};
 			},
 		);
