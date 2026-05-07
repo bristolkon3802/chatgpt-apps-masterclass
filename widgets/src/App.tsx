@@ -2,31 +2,22 @@ import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { LoadingIndicator } from "@openai/apps-sdk-ui/components/Indicator";
 import { useState } from "react";
 import type { ToolOutput } from "./types";
-import { DeckList } from "./components/deck-list";
-import { FlashcardStudy } from "./components/flashcard-study";
-
 
 
 function App() {
   const [toolOutput, setToolOutput] = useState<ToolOutput | null>(null);
-  const [viewUUID, setViewUUID] = useState<string | null>(null);
 
   const { app, error } = useApp({
-    appInfo: { name: "Flashcards Client", version: "1.0" },
+    appInfo: { name: "Workouts Client", version: "1.0" },
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = (result) => {
         if (result.structuredContent) {
           setToolOutput(result.structuredContent as unknown as ToolOutput);
         }
-        // server에서 상호 작용을 위해 UUID를 넘겨받는다.
-        if (result._meta) {
-          setViewUUID(result._meta.viewUUID as unknown as string)
-        }
       };
     },
   });
-
 
   // 다크 모드 설정
   useHostStyles(app, app?.getHostContext());
@@ -38,24 +29,6 @@ function App() {
       </div>
     )
   }
-
-  // 서버 응답에 decks가 있다면 DeckList 반환
-  if (toolOutput && "decks" in toolOutput) {
-    return <DeckList decks={toolOutput.decks} />;
-  }
-
-  // 
-  if (toolOutput && "deck" in toolOutput) {
-    return (
-      <FlashcardStudy
-        deck={toolOutput.deck}
-        app={app}
-        viewUUID={viewUUID}
-        username={"username" in toolOutput ? toolOutput.username : "anonymous"}
-      />
-    )
-  }
-
 
   return <div className="items-center justify-center flex min-h-50">
     <LoadingIndicator size={32} />

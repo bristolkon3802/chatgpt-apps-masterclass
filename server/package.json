@@ -8,11 +8,15 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate:local": "widgets d1 migrations apply workouts_database",
+		"db:migrate:romote": "widgets d1 migrations apply workouts_database --remote"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.12.4",
 		"@types/node": "^25.5.0",
+		"drizzle-kit": "^0.31.10",
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
 		"wrangler": "^4.77.0"
@@ -21,6 +25,7 @@
 		"@modelcontextprotocol/ext-apps": "^1.3.1",
 		"@modelcontextprotocol/sdk": "^1.28.0",
 		"agents": "^0.8.6",
+		"drizzle-orm": "^0.45.2",
 		"zod": "^4.3.6"
 	}
 }
