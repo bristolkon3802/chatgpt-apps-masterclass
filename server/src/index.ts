@@ -253,7 +253,7 @@ export default {
 
 				return {
 					content: [{ type: 'text', text: `운동 완료! 사용자가 ${calories}를 태웠습니다` }],
-					structuredContent: { calories },
+					structuredContent: { calories: parseInt(calories, 10) },
 				};
 			},
 		);
